@@ -4,7 +4,6 @@ import torchvision.transforms as transforms
 import ssl
 import matplotlib.pyplot as plt
 import numpy as np
-from dataset import Dataset
 from PIL import Image
 Image.MAX_IMAGE_PIXELS = None
 
@@ -19,14 +18,18 @@ ssl._create_default_https_context = ssl._create_unverified_context
 transform = transforms.Compose(
     [
 	 transforms.Resize(32),
+	 transforms.RandomHorizontalFlip(p=0.5),
+	 transforms.RandomVerticalFlip(p=0.5),
+	 transforms.RandomAffine(degrees=(-30,30), translate=(0, 0.5), scale=(0.4, 0.5), shear=(0,0), fillcolor=(0,255,255)),
+	 transforms.RandomGrayscale(p=0.5),
      transforms.ToTensor(),
      transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
 
 # Parameters
-params = {'batch_size': 72,
+params = {'batch_size': 22,
           'shuffle': True,
-          'num_workers': 8}
+          'num_workers': 12}
 
 
 #trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
@@ -51,12 +54,19 @@ import torch.nn.functional as F
 class Net(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
+        self.conv1 = nn.Conv2d(3, 20, 5)
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
+        self.conv2 = nn.Conv2d(20, 16, 5)
         self.fc1 = nn.Linear(16 * 5 * 5, 120)
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, 11)
+        torch.nn.init.xavier_uniform(self.conv1.weight)
+        torch.nn.init.xavier_uniform(self.conv2.weight)
+ 
+        torch.nn.init.xavier_uniform(self.fc1.weight)
+        torch.nn.init.xavier_uniform(self.fc2.weight)
+        torch.nn.init.xavier_uniform(self.fc3.weight)
+		
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
@@ -64,19 +74,20 @@ class Net(nn.Module):
         x = x.view(-1, 16 * 5 * 5)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
-        x = self.fc3(x)
+        x = F.relu(self.fc3(x))
         return x
 
 if __name__ == "__main__":
 	import os.path
 	from os import path
 	PATH = './cifar_net.pth'
-	if path.exists(PATH) is False:
+	if True:
 		print("Training")
 		net = Net()
+		#net.load_state_dict(torch.load(PATH))
 		import torch.optim as optim
 		criterion = nn.CrossEntropyLoss()
-		optimizer = optim.SGD(net.parameters(), lr=0.009, momentum=0.9)
+		optimizer = optim.SGD(net.parameters(), lr=0.0001, momentum=0.9)
 
 
 		for epoch in range(20):  # loop over the dataset multiple times
